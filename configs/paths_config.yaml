@@ -1,0 +1,3 @@
+# paths to data directories
+data_dir: ${hydra:runtime.cwd}/data/
+output_dir: ${hydra:runtime.cwd}/outputs/${task_name}

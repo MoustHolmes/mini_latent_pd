@@ -1,0 +1,83 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Unit test / coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.cache
+coverage.xml
+*.cover
+*.py,cover
+.pytest_cache/
+
+# ML-specific
+*.ckpt
+*.pth
+*.h5
+*.onnx
+wandb/
+lightning_logs/
+/data/*
+!/data/raw/.gitkeep
+!/data/processed/.gitkeep
+/models/*
+!/models/.gitkeep
+/logs/*
+!/logs/.gitkeep
+
+# Hydra
+outputs/
+multirun/
+.hydra/
+
+# Jupyter
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+*.swp
+*.swo
+
+# MacOS
+.DS_Store
+
+# mkdocs
+/site/
+
+# Environment
+.python-version
+poetry.lock
+pdm.lock

@@ -1,0 +1,15 @@
+# @package _global_
+
+# example experiment file
+# all parameters below will be merged with parameters from default_config.yaml
+
+trainer:
+  fast_dev_run: True
+
+data:
+  batch_size: 32
+  num_workers: 0
+
+logger:
+  wandb:
+    mode: disabled

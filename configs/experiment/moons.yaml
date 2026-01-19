@@ -1,0 +1,36 @@
+# @package _global_
+
+defaults:
+  - override /model: moons_model
+  - override /data: moons_data_module
+  - override /trainer: default_trainer
+  - _self_
+
+task_name: "moons_flow_matching"
+
+# Trainer configuration for 2D data
+trainer:
+  max_epochs: 100
+  accelerator: cpu
+  devices: 1
+  fast_dev_run: false
+  enable_checkpointing: true
+  enable_model_summary: true
+  enable_progress_bar: true
+  log_every_n_steps: 10
+
+# Data configuration
+data:
+  n_samples: 50000
+  noise: 0.05
+  batch_size: 2048
+  num_workers: 0
+
+# Model configuration
+model:
+  model:
+    hidden_dim: 128
+    num_layers: 4
+  optimizer:
+    lr: 0.001
+    weight_decay: 0.0

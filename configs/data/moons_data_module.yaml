@@ -1,0 +1,6 @@
+_target_: mini_latent_pd.data.moons_datamodule.MoonsDataModule
+
+n_samples: 50000
+noise: 0.05
+batch_size: 2048
+num_workers: 0
