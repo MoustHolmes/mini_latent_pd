@@ -49,6 +49,7 @@ lightning_logs/
 /data/*
 !/data/raw/.gitkeep
 !/data/processed/.gitkeep
+notebooks/data/*
 /models/*
 !/models/.gitkeep
 /logs/*
