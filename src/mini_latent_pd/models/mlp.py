@@ -34,10 +34,15 @@ class MoonsNet(nn.Module):
 
     def forward(self, x, t, y):
         """
-        x: (batch, 2) - 2D moons data points
+        x: (batch, input_dim) OR (batch, C, H, W)
         t: (batch,) - time values
         y: (batch,) - class labels (0, 1, or 2 for null class)
         """
+        original_shape = x.shape
+        # Flatten x if it is spatial (B, C, H, W) -> (B, C*H*W)
+        if x.dim() > 2:
+            x = x.view(x.shape[0], -1)
+
         # Get embeddings
         t_emb = self.time_mlp(t)  # (batch, time_dim)
         y_emb = self.class_emb(y)  # (batch, time_dim)
@@ -46,4 +51,10 @@ class MoonsNet(nn.Module):
         inputs = torch.cat([x, t_emb, y_emb], dim=-1)
 
         # Forward through network
-        return self.net(inputs)
+        out = self.net(inputs)
+        
+        # Reshape back to original shape if input was spatial
+        if len(original_shape) > 2:
+             out = out.view(original_shape)
+             
+        return out

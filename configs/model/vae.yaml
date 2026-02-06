@@ -1,0 +1,18 @@
+_target_: mini_latent_pd.vae_module.SpatialVAE
+in_channels: 1
+latent_channels: 4
+kl_weight: 0.0025
+encoder_hidden_dims: [32]
+decoder_hidden_dims: [32]
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001
+  weight_decay: 0.0
+
+lr_scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  patience: 5
+  factor: 0.2

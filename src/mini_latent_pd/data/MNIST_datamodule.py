@@ -10,7 +10,7 @@ class MNISTDataModule(L.LightningDataModule):
         data_dir: str = "data",
         batch_size: int = 128,
         num_workers: int = 4,
-        pin_memory: bool = True,
+        pin_memory: bool = False,
     ):
         super().__init__()
         self.data_dir = data_dir

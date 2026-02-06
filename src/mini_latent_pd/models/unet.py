@@ -69,76 +69,92 @@ class ResidualBlock(nn.Module):
 
 class UNet(nn.Module):
     """Simplified U-Net architecture for conditional vector field/score estimation."""
-
     def __init__(
-        self, in_channels=1, model_channels=64, out_channels=1, time_dim=256, num_classes=11
+        self, 
+        in_channels: int = 4,
+        out_channels: int = 4, 
+        model_channels: int = 64, 
+        channel_mult: list[int] = [1, 2, 2],
+        time_dim: int = 256, 
+        num_classes: int = 11
     ):
         super().__init__()
         self.time_dim = time_dim
+        
+        # 1. Time & Class Embeddings
         self.time_mlp = nn.Sequential(
             FourierEncoder(time_dim),
             nn.Linear(time_dim, time_dim),
             nn.GELU(),
             nn.Linear(time_dim, time_dim),
         )
-
-        # Class embedding
         self.class_emb = nn.Embedding(num_classes, time_dim)
 
-        # Initial convolution
+        # 2. Input Convolution
         self.init_conv = nn.Conv2d(in_channels, model_channels, 3, padding=1)
 
-        # Encoder
-        self.down1 = ResidualBlock(model_channels, model_channels, time_dim)
-        self.down2 = ResidualBlock(model_channels, model_channels * 2, time_dim)
-        self.down3 = ResidualBlock(model_channels * 2, model_channels * 2, time_dim)
+        # 3. Dynamic Encoder (Down)
+        self.downs = nn.ModuleList()
+        ch = model_channels
+        dims = [ch] # Keep track of channels for skip connections
+        
+        for mult in channel_mult:
+            out_ch = model_channels * mult
+            # For 7x7 input, be careful with pooling! 
+            # We can use stride=1 (no downsample) for the last layers if needed
+            self.downs.append(ResidualBlock(ch, out_ch, time_dim)) 
+            ch = out_ch
+            dims.append(ch)
 
-        # Bottleneck
-        self.bottleneck1 = ResidualBlock(model_channels * 2, model_channels * 4, time_dim)
-        self.bottleneck2 = ResidualBlock(model_channels * 4, model_channels * 4, time_dim)
+        # 4. Bottleneck
+        self.mid_block1 = ResidualBlock(ch, ch, time_dim)
+        self.mid_block2 = ResidualBlock(ch, ch, time_dim)
 
-        # Decoder
-        self.up1 = ResidualBlock(model_channels * 6, model_channels * 2, time_dim)
-        self.up2 = ResidualBlock(model_channels * 4, model_channels * 2, time_dim)
-        self.up3 = ResidualBlock(model_channels * 3, model_channels, time_dim)
+        # 5. Dynamic Decoder (Up)
+        self.ups = nn.ModuleList()
+        # Remove the last dim from list as it is the bottleneck input
+        dims.pop() 
+        
+        for mult in reversed(channel_mult):
+            out_ch = model_channels * mult
+            skip_ch = dims.pop()
+            # Input to ResBlock is current_ch + skip_ch
+            self.ups.append(ResidualBlock(ch + skip_ch, out_ch, time_dim))
+            ch = out_ch
 
-        # Output
-        self.final_norm = nn.GroupNorm(8, model_channels)
+        # 6. Output
+        self.final_norm = nn.GroupNorm(8, ch)
         self.final_act = nn.SiLU()
-        self.final = nn.Conv2d(model_channels, out_channels, 1)
+        self.final = nn.Conv2d(ch, out_channels, 1)
 
     def forward(self, x, t, y):
-        # Time and class embedding
+        # Embeddings
         t_emb = self.time_mlp(t)
         y_emb = self.class_emb(y)
-        cond_emb = t_emb + y_emb
+        cond = t_emb + y_emb
 
-        # Initial processing
-        x = self.init_conv(x)
+        h = self.init_conv(x)
+        skips = [h]
 
-        # Encoder path with skip connections
-        d1 = self.down1(x, cond_emb)
-        d2 = self.down2(F.avg_pool2d(d1, 2), cond_emb)
-        d3 = self.down3(F.avg_pool2d(d2, 2), cond_emb)
+        # Down
+        for layer in self.downs:
+            h = layer(h, cond)
+            skips.append(h)
+            # Standard UNet pools AFTER the block. 
+            # Note: For 7x7 latents, consider removing pooling or using it sparingly.
+            if h.shape[-1] > 1: 
+                h = F.avg_pool2d(h, 2)
 
         # Bottleneck
-        b = self.bottleneck1(F.avg_pool2d(d3, 2), cond_emb)
-        b = self.bottleneck2(b, cond_emb)
+        h = self.mid_block1(h, cond)
+        h = self.mid_block2(h, cond)
 
-        # Decoder with skip connections
-        u1 = self.up1(
-            torch.cat([F.interpolate(b, size=d3.shape[-2:], mode="bilinear"), d3], dim=1), cond_emb
-        )
-        u2 = self.up2(
-            torch.cat([F.interpolate(u1, size=d2.shape[-2:], mode="bilinear"), d2], dim=1), cond_emb
-        )
-        u3 = self.up3(
-            torch.cat([F.interpolate(u2, size=d1.shape[-2:], mode="bilinear"), d1], dim=1), cond_emb
-        )
+        # Up
+        for layer in self.ups:
+            skip = skips.pop()
+            # Upsample to match skip connection size
+            h = F.interpolate(h, size=skip.shape[-2:], mode="bilinear", align_corners=False)
+            h = torch.cat([h, skip], dim=1)
+            h = layer(h, cond)
 
-        # Final processing
-        out = self.final_norm(u3)
-        out = self.final_act(out)
-        out = self.final(out)
-
-        return out
+        return self.final(self.final_act(self.final_norm(h)))

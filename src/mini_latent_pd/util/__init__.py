@@ -1,7 +1,7 @@
 """Utility functions for diffusion playground."""
 
-from mini_latent_pd.util.plot_imgs import plot_images
+from mini_latent_pd.util.plot_imgs import show_imgs
 
 __all__ = [
-    "plot_images",
+    "show_imgs",
 ]

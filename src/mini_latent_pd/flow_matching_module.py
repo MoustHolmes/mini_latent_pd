@@ -13,6 +13,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau, _LRScheduler
 from mini_latent_pd.modules.schedulers import LinearScheduler
 from mini_latent_pd.modules.samplers import GaussianSampler
 from mini_latent_pd.modules.solvers import EulerSolver
+from mini_latent_pd.modules.latent_processors import LatentProcessor
 
 
 class FlowMatching(L.LightningModule):
@@ -95,6 +96,7 @@ class FlowMatching(L.LightningModule):
         """Performs a single validation step."""
         loss = self.model_step(batch)
         self.log('val/flow_matching_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log('val/loss', loss, on_step=False, on_epoch=True, prog_bar=False)
 
     def test_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Performs a single test step."""
@@ -223,6 +225,7 @@ class FlowMatchingCFG(L.LightningModule):
         """Performs a single validation step."""
         loss = self.model_step(batch)
         self.log('val/flow_matching_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log('val/loss', loss, on_step=False, on_epoch=True, prog_bar=False)
 
     def test_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Performs a single test step."""
@@ -286,3 +289,132 @@ class FlowMatchingCFG(L.LightningModule):
         # We pass the guided callable to the solver. The solver will internally call it like:
         # guided_model_callable(x, t, labels=labels)
         return self.ode_solver.solve(guided_model_callable, x0=x0, labels=labels, steps=steps)
+
+
+class LatentFlowMatching(FlowMatching):
+    """A PyTorch Lightning module for training a Flow Matching model in a latent space.
+
+    This module acts as a wrapper that encodes inputs into a latent space before
+    performing flow matching comparisons, and decodes generated latents back to
+    data space.
+
+    Attributes:
+        encoder (torch.nn.Module): Encodes x -> z.
+        decoder (torch.nn.Module): Decodes z -> x.
+        freeze_ae (bool): Whether to freeze the encoder and decoder parameters.
+        model (torch.nn.Module): The neural network that predicts the vector field on z.
+        (Other attributes inherited from FlowMatching)
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        latent_processor: LatentProcessor | None = None,
+        alpha_beta_scheduler: nn.Module = LinearScheduler(data_dim=4),
+        sampler: nn.Module = GaussianSampler(target_shape=(4, 7, 7)),
+        ode_solver: nn.Module = EulerSolver(),
+        optimizer: Callable[..., Optimizer] | None = None,
+        lr_scheduler: Callable[..., _LRScheduler] | None = None,
+        freeze_ae: bool = True,
+    ) -> None:
+        """Initializes the LatentFlowMatching module.
+        
+        Args:
+            model: The flow matching model.
+            encoder: Optional encoder instance.
+            decoder: Optional decoder instance.
+            vae_checkpoint_path: Path to a SpatialVAE checkpoint. If provided, overrides encoder/decoder args.
+            ...
+        """
+        super().__init__(
+            model=model,
+            alpha_beta_scheduler=alpha_beta_scheduler,
+            sampler=sampler,
+            ode_solver=ode_solver,
+            optimizer=optimizer,
+            lr_scheduler=lr_scheduler,
+        )
+        self.save_hyperparameters(logger=False, ignore=["latent_processor", "model", "alpha_beta_scheduler", "sampler", "ode_solver"])
+        
+        # Restore hparams that might have been overwritten with None by self.save_hyperparameters
+        self.hparams.optimizer = optimizer or partial(Adam, lr=1e-3)
+        self.hparams.lr_scheduler = lr_scheduler or partial(ReduceLROnPlateau, patience=5, factor=0.2)
+
+        self.latent_processor = latent_processor
+        
+
+    def model_step(self, batch: tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
+        """Performs a single model step involves encoding data first."""
+        real_images, labels = batch
+        
+        latents = self.latent_processor.encode(real_images)
+
+        return super().model_step((latents, labels))
+
+    @torch.no_grad()
+    def generate_samples(self, labels: torch.Tensor, steps: int = 50) -> torch.Tensor:
+        """Generates samples by sampling latents and decoding them."""
+        # Generate latents using the base class method
+        latents = super().generate_samples(labels, steps=steps)
+        # Decode back to data space
+        return self.latent_processor.decode(latents)
+
+
+class LatentFlowMatchingCFG(FlowMatchingCFG):
+    """A PyTorch Lightning module for training a Flow Matching model in a latent space
+    with Classifier-Free Guidance.
+
+    Attributes:
+        latent_processor (LatentProcessor): Processes data to and from latent space.
+        freeze_ae (bool): Whether to freeze the encoder and decoder parameters.
+        (Other attributes inherited from FlowMatchingCFG)
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        latent_processor: LatentProcessor | None = None,
+        alpha_beta_scheduler: nn.Module = LinearScheduler(data_dim=4),
+        sampler: nn.Module = GaussianSampler(target_shape=(1, 28, 28)),
+        ode_solver: nn.Module = EulerSolver(),
+        num_classes: int = 10,
+        cfg_prob: float = 0.1,
+        guidance_scale: float = 3.0,
+        optimizer: Callable[..., Optimizer] | None = None,
+        lr_scheduler: Callable[..., _LRScheduler] | None = None,
+    ) -> None:
+        """Initializes the LatentFlowMatchingCFG module."""
+        super().__init__(
+            model=model,
+            alpha_beta_scheduler=alpha_beta_scheduler,
+            sampler=sampler,
+            ode_solver=ode_solver,
+            num_classes=num_classes,
+            cfg_prob=cfg_prob,
+            guidance_scale=guidance_scale,
+            optimizer=optimizer,
+            lr_scheduler=lr_scheduler,
+        )
+        self.save_hyperparameters(logger=False, ignore=["latent_processor", "model", "alpha_beta_scheduler", "sampler", "ode_solver"])
+
+        self.hparams.optimizer = optimizer or partial(Adam, lr=1e-4)
+        self.hparams.lr_scheduler = lr_scheduler or partial(ReduceLROnPlateau, patience=5, factor=0.2)
+        self.hparams.num_classes = num_classes + 1
+        
+        self.latent_processor = latent_processor
+
+    def model_step(self, batch: tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
+        """Performs a single model step involves encoding data first."""
+        real_images, labels = batch
+        
+        latents = self.latent_processor.encode(real_images)
+
+        return super().model_step((latents, labels))
+
+    @torch.no_grad()
+    def generate_samples(
+        self, labels: torch.Tensor, steps: int = 50, guidance_scale: float | None = None
+    ) -> torch.Tensor:
+        """Generates samples by sampling latents and decoding them."""
+        latents = super().generate_samples(labels, steps=steps, guidance_scale=guidance_scale)
+        return self.latent_processor.decode(latents)

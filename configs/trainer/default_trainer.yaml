@@ -1,9 +1,9 @@
 _target_: lightning.pytorch.Trainer
 min_epochs: 1 # prevents early stopping
-max_epochs: 2
+max_epochs: 10
 log_every_n_steps: 1
 
-accelerator: cpu
+accelerator: gpu
 devices: 1
 
 # mixed precision for extra speed-up
