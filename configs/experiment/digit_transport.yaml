@@ -1,0 +1,33 @@
+# @package _global_
+
+defaults:
+  - override /model: digit_transport
+  - override /data: consecutive_digit_data_module
+  - override /trainer: default_trainer
+  - _self_
+
+task_name: "digit_transport_flow_matching"
+
+# Trainer configuration
+trainer:
+  max_epochs: 10
+  accelerator: auto
+  devices: auto
+  fast_dev_run: false
+  enable_checkpointing: true
+  enable_model_summary: true
+  enable_progress_bar: true
+  log_every_n_steps: 50
+
+# Data configuration
+data:
+  batch_size: 128
+  num_workers: 1
+
+# Model configuration
+model:
+  model:
+    model_channels: 64
+  optimizer:
+    lr: 0.001
+    weight_decay: 0.0

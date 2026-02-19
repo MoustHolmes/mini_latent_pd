@@ -360,6 +360,130 @@ class LatentFlowMatching(FlowMatching):
         return self.latent_processor.decode(latents)
 
 
+class DigitTransportFlowMatching(L.LightningModule):
+    """A Flow Matching module that learns to transport one MNIST digit to the next.
+
+    Instead of sampling random noise as the initial distribution, this module
+    uses a real image of digit N as x0 and a real image of digit (N+1) % 10 as
+    the target x1. The model learns the vector field that transports one digit
+    into the next consecutive one.
+
+    The data module must yield batches of ``(source_images, target_images, labels)``.
+
+    Attributes:
+        model (torch.nn.Module): The network predicting the vector field.
+        alpha_beta_scheduler (torch.nn.Module): Scheduler for interpolation coefficients.
+        ode_solver (torch.nn.Module): ODE solver for generation.
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        alpha_beta_scheduler: nn.Module = LinearScheduler(data_dim=4),
+        ode_solver: nn.Module = EulerSolver(),
+        optimizer: Callable[..., Optimizer] | None = None,
+        lr_scheduler: Callable[..., _LRScheduler] | None = None,
+    ) -> None:
+        """Initializes the DigitTransportFlowMatching module.
+
+        Args:
+            model: Neural network that predicts the vector field.
+            alpha_beta_scheduler: Scheduler for interpolation coefficients (alpha_t, beta_t).
+            ode_solver: ODE solver for generating transported samples.
+            optimizer: Partial function for optimizer creation. Defaults to Adam.
+            lr_scheduler: Partial function for LR scheduler. Defaults to ReduceLROnPlateau.
+        """
+        super().__init__()
+        self.save_hyperparameters(logger=False, ignore=["model", "alpha_beta_scheduler", "ode_solver"])
+
+        self.model = model
+        self.alpha_beta_scheduler = alpha_beta_scheduler
+        self.ode_solver = ode_solver
+
+        self.hparams.optimizer = optimizer or partial(Adam, lr=1e-3)
+        self.hparams.lr_scheduler = lr_scheduler or partial(ReduceLROnPlateau, patience=5, factor=0.2)
+
+    def forward(self, x: torch.Tensor, t: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Defines the forward pass of the model."""
+        return self.model(x, t, y)
+
+    def model_step(self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor]) -> torch.Tensor:
+        """Performs a single model step on a batch of consecutive digit pairs.
+
+        Args:
+            batch: A tuple of (source_images, target_images, source_labels).
+        """
+        source_images, target_images, labels = batch
+        batch_size = source_images.shape[0]
+
+        # x0 is the source digit, x1 is the target (next) digit
+        x0 = source_images
+        x1 = target_images
+
+        t = torch.rand(batch_size, device=self.device)
+        alpha_t, beta_t = self.alpha_beta_scheduler(t)
+
+        # Interpolate: xt = alpha_t * x1 + beta_t * x0
+        xt = alpha_t * x1 + beta_t * x0
+
+        # Target velocity: go from x0 to x1
+        u_target = x1 - x0
+        u_pred = self(xt, t, labels)
+
+        loss = F.mse_loss(u_pred, u_target)
+        return loss
+
+    def training_step(self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
+        """Performs a single training step."""
+        loss = self.model_step(batch)
+        self.log('train/flow_matching_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
+        return loss
+
+    def validation_step(self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor], batch_idx: int) -> None:
+        """Performs a single validation step."""
+        loss = self.model_step(batch)
+        self.log('val/flow_matching_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log('val/loss', loss, on_step=False, on_epoch=True, prog_bar=False)
+
+    def test_step(self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor], batch_idx: int) -> None:
+        """Performs a single test step."""
+        loss = self.model_step(batch)
+        self.log('test/flow_matching_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
+
+    def configure_optimizers(self) -> dict[str, Any]:
+        """Configures the optimizers and learning rate schedulers."""
+        optimizer = self.hparams.optimizer(self.parameters())
+        scheduler = self.hparams.lr_scheduler(optimizer)
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "monitor": "val/flow_matching_loss",
+                "interval": "epoch",
+            },
+        }
+
+    @torch.no_grad()
+    def generate_samples(
+        self, source_images: torch.Tensor, labels: torch.Tensor, steps: int = 50
+    ) -> torch.Tensor:
+        """Transports source images to the next consecutive digit.
+
+        Args:
+            source_images: Images of digit N to transport.
+            labels: The source digit labels (used for conditioning).
+            steps: Number of ODE solver steps.
+
+        Returns:
+            torch.Tensor: The transported images (predicted digit N+1).
+        """
+        self.model.eval()
+        x0 = source_images.to(self.device)
+        samples = self.ode_solver.solve(self.model, x0, labels, steps)
+        return samples
+
+
 class LatentFlowMatchingCFG(FlowMatchingCFG):
     """A PyTorch Lightning module for training a Flow Matching model in a latent space
     with Classifier-Free Guidance.

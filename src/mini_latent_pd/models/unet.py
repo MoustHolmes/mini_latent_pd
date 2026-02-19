@@ -112,9 +112,7 @@ class UNet(nn.Module):
 
         # 5. Dynamic Decoder (Up)
         self.ups = nn.ModuleList()
-        # Remove the last dim from list as it is the bottleneck input
-        dims.pop() 
-        
+
         for mult in reversed(channel_mult):
             out_ch = model_channels * mult
             skip_ch = dims.pop()

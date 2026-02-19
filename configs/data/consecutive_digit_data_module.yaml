@@ -1,0 +1,7 @@
+_target_: mini_latent_pd.data.consecutive_digit_datamodule.ConsecutiveDigitDataModule
+data_dir: ${data_dir}
+batch_size: 128
+num_workers: 1
+pin_memory: true
+train_length: 55000
+val_length: 5000
