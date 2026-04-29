@@ -1,0 +1,28 @@
+# @package _global_
+
+# Quick debug run for distance flow matching
+# Usage: python -m mini_latent_pd.train experiment=distance_flow_debug
+
+defaults:
+  - override /model: distance_flow
+  - override /data: mdcath_flow_data_module
+
+task_name: distance_flow_debug
+
+trainer:
+  fast_dev_run: true
+  accelerator: auto
+  devices: 1
+
+data:
+  batch_size: 2
+  samples_per_epoch: 10
+  val_samples_per_epoch: 5
+  num_workers: 0
+
+model:
+  decode_every_n_val_steps: 1
+
+logger:
+  wandb:
+    mode: disabled

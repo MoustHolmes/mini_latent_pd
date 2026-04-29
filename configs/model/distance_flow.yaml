@@ -1,0 +1,26 @@
+_target_: mini_latent_pd.distance_flow_module.DistanceFlowModule
+
+velocity_net:
+  _target_: mini_latent_pd.models.velocity_net.DistanceVelocityNet
+  num_bins: 64
+  d_model: 64
+  n_layers: 4
+  c_z_static: 128
+  expand: 4
+
+decoder: null
+decoder_checkpoint: ${hydra:runtime.cwd}/checkpoints/minifold_cache/minifold_12L.ckpt
+num_miniformer_layers: 12
+decode_every_n_val_steps: 50
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 1e-4
+  weight_decay: 0.0
+
+lr_scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  patience: 5
+  factor: 0.2

@@ -4,8 +4,24 @@ from torch import Tensor
 import torch.nn.functional as F
 
 from mini_latent_pd.models.minifold.utils import init
-from mini_latent_pd.models.minifold.model.kernels.gating import gating_kernel
-from mini_latent_pd.models.minifold.model.kernels.mlp import mlp_kernel
+
+# Lazy-import compiled kernels to avoid torch.compile crash on Python 3.12+
+_gating_kernel = None
+_mlp_kernel = None
+
+def _get_gating_kernel():
+    global _gating_kernel
+    if _gating_kernel is None:
+        from mini_latent_pd.models.minifold.model.kernels.gating import gating_kernel
+        _gating_kernel = gating_kernel
+    return _gating_kernel
+
+def _get_mlp_kernel():
+    global _mlp_kernel
+    if _mlp_kernel is None:
+        from mini_latent_pd.models.minifold.model.kernels.mlp import mlp_kernel
+        _mlp_kernel = mlp_kernel
+    return _mlp_kernel
 
 
 def mlp(x, w1, w2, b1, b2, wn, bn):
@@ -64,7 +80,7 @@ def mlp_kernel_func(x, w1, w2, b1, b2, wn, bn):
     """Perform a two-layer MLP with a residual connection."""
     w1 = w1.t().contiguous()
     w2 = w2.t().contiguous()
-    return mlp_kernel(x, w1, w2, b1, b2, wn, bn)
+    return _get_mlp_kernel()(x, w1, w2, b1, b2, wn, bn)
 
 
 def triangular_kernel_func(
@@ -91,7 +107,7 @@ def triangular_kernel_func(
     po_w = po_w.t().contiguous()
 
     # Input gating: D -> D
-    x = gating_kernel(x, gi_w, pi_w, gi_b, pi_b, ni_w, ni_b)
+    x = _get_gating_kernel()(x, gi_w, pi_w, gi_b, pi_b, ni_w, ni_b)
     # Apply mask
     x = x * mask.unsqueeze(-1)
 
@@ -108,7 +124,7 @@ def triangular_kernel_func(
         x = torch.cat([x1, x2], dim=-1).to(x.dtype)
 
     # Output gating: D / 2 -> D
-    x = gating_kernel(x, go_w, po_w, go_b, po_b, no_w, no_b)
+    x = _get_gating_kernel()(x, go_w, po_w, go_b, po_b, no_w, no_b)
     return x
 
 

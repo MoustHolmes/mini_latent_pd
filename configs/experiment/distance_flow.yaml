@@ -1,0 +1,25 @@
+# @package _global_
+
+# Distance flow matching experiment for molecular dynamics
+# Usage: python -m mini_latent_pd.train experiment=distance_flow
+
+defaults:
+  - override /model: distance_flow
+  - override /data: mdcath_flow_data_module
+
+task_name: distance_flow
+
+trainer:
+  max_epochs: 50
+  log_every_n_steps: 10
+  check_val_every_n_epoch: 1
+  accelerator: auto
+  devices: 1
+  precision: 32
+
+data:
+  batch_size: 4
+  samples_per_epoch: 2000
+  val_samples_per_epoch: 400
+  max_lag: 200
+  num_workers: 0

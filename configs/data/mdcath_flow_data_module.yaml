@@ -1,0 +1,12 @@
+_target_: mini_latent_pd.data.mdcath_flow_datamodule.MDCathFlowDataModule
+
+data_dir: ${data_dir}/mdcath/data
+embedding_dir: ${data_dir}/embeddings
+batch_size: 4
+samples_per_epoch: 1000
+val_samples_per_epoch: 200
+max_lag: 200
+max_seq_len: 900
+num_workers: 0
+pin_memory: true
+use_bucket_sampler: false
