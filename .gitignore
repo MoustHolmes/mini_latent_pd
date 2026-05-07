@@ -85,4 +85,7 @@ multirun/
 poetry.lock
 pdm.lock
 
+#ignore local path config file
+configs/paths_config_local.yaml
+
 scalability_playground
