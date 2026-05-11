@@ -116,13 +116,21 @@ def _pad_and_stack(tensors: list[torch.Tensor], target: int, dim: int) -> torch.
 
 
 def _pad_and_stack_2d(tensors: list[torch.Tensor], target: int) -> torch.Tensor:
-    """Pad both dim 0 and dim 1 (token × token tensors)."""
+    """Pad both dim 0 and dim 1 (token × token tensors).
+
+    torch.nn.functional.pad uses reverse-dim order:
+      (last_dim_left, last_dim_right, second_last_left, second_last_right, ...)
+    For a (L, L) tensor: pad = (0, target-L, 0, target-L).
+    For a (L, L, C) tensor: pad = (0, 0, 0, target-L, 0, target-L).
+    """
     padded = []
     for t in tensors:
         d0, d1 = t.shape[0], t.shape[1]
-        t = torch.nn.functional.pad(
-            t, (0, 0, 0, target - d1, 0, target - d0), value=0
-        )
+        trailing = t.shape[2:]
+        # Build padding: trailing dims get (0,0), then dim1, then dim0
+        pad = tuple(0 for _ in range(2 * len(trailing)))
+        pad = pad + (0, target - d1, 0, target - d0)
+        t = torch.nn.functional.pad(t, pad, value=0)
         padded.append(t)
     return torch.stack(padded)
 

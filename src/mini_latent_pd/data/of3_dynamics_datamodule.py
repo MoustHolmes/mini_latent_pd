@@ -125,3 +125,27 @@ class OF3DynamicsDataModule(pl.LightningDataModule):
             collate_fn=of3_collate,
             pin_memory=False,
         )
+
+    def val_dataloader(self) -> DataLoader:
+        # Use a small fixed subset of the dynamics dataset for validation.
+        # Samples are drawn with a fixed seed to keep validation set stable.
+        from mini_latent_pd.data.mdcath_of3_dataset import MDCATHOpenFold3Dataset
+
+        val_dataset = MDCATHOpenFold3Dataset(
+            data_dir=self.mdcath_data_dir,
+            use_template=self.use_template,
+            msa_dir=self.msa_dir,
+            samples_per_epoch=max(8, self.batch_size * 4),
+            max_lag=self.max_lag,
+            max_seq_len=self.max_seq_len,
+            temps=self.temps,
+            replicas=self.replicas,
+        )
+        return DataLoader(
+            val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=0,
+            collate_fn=of3_collate,
+            pin_memory=False,
+        )

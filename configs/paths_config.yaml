@@ -1,3 +1,7 @@
 # paths to data directories
 data_dir: ${hydra:runtime.cwd}/data/
-output_dir: ${hydra:runtime.cwd}/outputs/${task_name}
+output_dir: ${hydra:runtime.output_dir}
+
+# mdCATH paths (override at runtime for HPC)
+mdcath_data_dir: ${hydra:runtime.cwd}/data/mdcath/data
+msa_dir: null

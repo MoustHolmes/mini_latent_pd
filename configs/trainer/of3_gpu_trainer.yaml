@@ -1,0 +1,28 @@
+_target_: lightning.pytorch.Trainer
+
+# Hardware
+accelerator: gpu
+devices: 1
+num_nodes: 1
+
+# Precision — bf16-mixed is fastest on A100/H100; use 32 for CPU debugging
+precision: bf16-mixed
+
+# Training duration (max_steps preferred over max_epochs for dynamics)
+max_epochs: -1
+max_steps: -1
+
+# Validation: run every N train steps, limit how many val batches
+#   (full diffusion rollout is expensive — 8 batches is enough for a health check)
+val_check_interval: 1000
+limit_val_batches: 8
+
+# Gradient clipping
+gradient_clip_val: 1.0
+gradient_clip_algorithm: norm
+
+# Logging
+log_every_n_steps: 50
+
+# DDP — set strategy: ddp for multi-GPU
+strategy: auto

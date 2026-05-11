@@ -271,6 +271,12 @@ def _pdb_record_to_of3_batch(record: dict, msa_dir: Path | None) -> dict:
             k: torch.tensor(v, dtype=torch.float32)
             for k, v in _DEFAULT_LOSS_WEIGHTS.items()
         },
+        # Metadata — used by training loop logging
+        "pdb_id": record["id"],
+        "preferred_chain_or_interface": "A",
+        "domain_id": record["id"],
+        "temp": torch.tensor(0, dtype=torch.int32),
+        "lag": torch.tensor(0, dtype=torch.int32),
         **msa_feats,
         **_zero_template_features(L, n_templ=1),
     }

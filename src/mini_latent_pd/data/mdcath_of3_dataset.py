@@ -210,6 +210,12 @@ class MDCATHOpenFold3Dataset(MDCATHBaseDataset):
                 k: torch.tensor(v, dtype=torch.float32)
                 for k, v in _DEFAULT_LOSS_WEIGHTS.items()
             },
+            # Metadata — used by training loop logging and RMSD callback
+            "pdb_id": prot.id,
+            "preferred_chain_or_interface": "A",
+            "domain_id": prot.id,
+            "temp": torch.tensor(temp, dtype=torch.int32),
+            "lag": torch.tensor(lag, dtype=torch.int32),
         }
 
         # MSA features

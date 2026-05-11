@@ -1,0 +1,21 @@
+_target_: mini_latent_pd.data.of3_dynamics_datamodule.OF3DynamicsDataModule
+
+# Paths — override at runtime:
+#   python src/mini_latent_pd/train.py --config-name=train_dynamics \
+#     data.mdcath_data_dir=/hpc/path/mdcath/data \
+#     data.msa_dir=/hpc/path/mdcath/msa
+mdcath_data_dir: ${paths.mdcath_data_dir}
+msa_dir: ${paths.msa_dir}
+
+# Template conditioning: x0 frame conditions diffusion via structural template
+use_template: true
+
+batch_size: 1
+num_workers: 4
+samples_per_epoch: 10000
+max_lag: 200
+max_seq_len: 900
+
+# null = include all 5 mdCATH temperatures / all replicas
+temps: null
+replicas: null

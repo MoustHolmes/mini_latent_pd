@@ -1,0 +1,10 @@
+defaults:
+  - paths_config
+  - model: of3_dynamics
+  - data: of3_dynamics_datamodule
+  - trainer: of3_gpu_trainer
+  - callbacks: of3_dynamics_callbacks
+  - logger: wandb_logger
+  - _self_
+
+task_name: dynamics_of3

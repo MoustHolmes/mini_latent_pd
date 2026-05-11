@@ -1,0 +1,30 @@
+_target_: mini_latent_pd.of3_diffusion_module.OF3DiffusionModule
+
+# Nested overrides on top of the base OF3 model config.
+# Uncomment the block-count lines for a fast smoke test on CPU.
+of3_overrides: {}
+  # architecture:
+  #   pairformer:
+  #     no_blocks: 1
+  #   diffusion_module:
+  #     diffusion_transformer:
+  #       no_blocks: 1
+
+disable_evo_attention: true
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 1.8e-3
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+
+lr_scheduler:
+  _target_: openfold3.core.utils.lr_schedulers.AlphaFoldLRScheduler
+  _partial_: true
+  base_lr: 0.0
+  max_lr: 1.8e-3
+  warmup_no_steps: 1000
+  start_decay_after_n_steps: 50000
+  decay_every_n_steps: 50000
+  decay_factor: 0.95

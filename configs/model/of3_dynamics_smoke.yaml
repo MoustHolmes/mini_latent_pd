@@ -1,0 +1,13 @@
+defaults:
+  - of3_dynamics
+  - _self_
+
+of3_overrides:
+  architecture:
+    pairformer:
+      no_blocks: 1
+    msa_module:
+      no_blocks: 1
+    diffusion_module:
+      diffusion_transformer:
+        no_blocks: 1
